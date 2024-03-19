@@ -1,0 +1,839 @@
+---
+title: "Project"
+author: "Baixi Guo ,Achyuth Kolluru, Ruoxi Zhao, Cristian Espinosa"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1 Exploratory Data Analysis
+## 1.1 Data Import, Automatic Encoding & Visualization
+```{r}
+# Import data set
+ScData = read.csv("Math.csv", stringsAsFactors = TRUE)
+# View the content and dim of data set
+head(ScData)
+
+# Visualize on Boxplot and distribution plot for Socio-economic , "failures" predictors
+par(mfrow = c(2, 4))
+boxplot.list = c("Fedu", "Medu", "Fjob", "Mjob", "internet", "failures", "absences")
+for(i in 1:length(boxplot.list)){
+  formula = "G3 ~"
+  formula = paste(formula, boxplot.list[i])
+  boxplot(eval(parse(text = formula)), data = ScData)
+}
+hist(ScData$absences)
+```
+
+## 1.2 Abnormal Data Cleansing & Missing Value Checking
+```{r}
+# Check Whether Empty Value/NA Exists
+NA.count = 0
+for(i in 1:length(ScData)){
+  NA.count = sum(is.na(ScData[[i]]))
+}
+print(paste(paste("There are", NA.count), "missing values"))
+
+# Abnormal Data Cleansing
+ScData = ScData[ScData$Medu!=0,]
+ScData = ScData[ScData$Fedu!=0,]
+
+# Remove high leverage points in "absences" predictor that only appeared once
+ScData = ScData[ScData$absences %in% names(which(table(ScData$absences ) > 1)), ]
+```
+
+## 1.3 Manual Encoding 
+```{r}
+# Manual one-hot encoding
+ScData$Medu = as.factor(ScData$Medu)
+ScData$Fedu = as.factor(ScData$Fedu)
+ScData$traveltime = as.factor(ScData$traveltime)
+ScData$studytime = as.factor(ScData$studytime)
+ScData$failures = as.factor(ScData$failures)
+ScData$famrel = as.factor(ScData$famrel)
+ScData$freetime = as.factor(ScData$freetime)
+ScData$goout = as.factor(ScData$goout)
+ScData$Dalc = as.factor(ScData$Dalc)
+ScData$Walc = as.factor(ScData$Walc)
+ScData$health = as.factor(ScData$health)
+```
+We have performed pre-processing such as one-hot-encoding, both in automatical and manual ways as most of the predictors are qualitative data and result will not be meaningful if we treat all categorical data as continuous data
+
+## 1.4 Dataset Extraction
+```{r}
+# Extract Dataset Based on Only Socio-Econ or All Predictors (With OR Without G1, G2 predictors)
+ScData_NG = ScData[-c(31,32)]  # Dataset without G1 & G2 
+ScData_Socio_NG = ScData[c("Pstatus", "Fedu", "Medu", "Fjob", "Mjob", "famsup", "paid", "internet", "G3")] # Dataset with socio-economic predictor but without G1 & G2
+ScData_Socio = ScData[c("Pstatus", "Fedu", "Medu", "Fjob", "Mjob", "famsup", "paid", "internet", "G1", "G2", "G3")] # Dataset with socio-economic predictors includes G1 & G2
+```
+
+
+# 2 Feature Selection
+## 2.1 R Built-In Subset Selection (Not Adequate for Qualitative Data)
+```{r}
+library(leaps)
+# Best Subset Selection
+regfit.best = regsubsets(G3 ~ ., ScData_NG, nvmax = 6, really.big=TRUE)
+best.sum = summary(regfit.best)
+
+# Plot RSS, Cp, BIC & Adjusted R^2
+par(mfrow = c(2,2))
+plot(best.sum$rss,   xlab = "Numbers of Variables", ylab = "RSS",          type = "l")
+plot(best.sum$adjr2, xlab = "Numbers of Variables", ylab = "Adjusted Rsq", type = "l")
+abline(v = which.max(best.sum$adjr2), col = 'red')
+plot(best.sum$cp,    xlab = "Numbers of Variables", ylab = "Cp",           type = "l")
+abline(v = which.min(best.sum$cp), col = 'orange')
+plot(best.sum$bic,   xlab = "Numbers of Variables", ylab = "BIC",          type = "l")
+abline(v = which.min(best.sum$bic), col = 'blue')
+# ********************************************************************************************
+
+# Forward Subset Selection
+regfit.forward = regsubsets(G3 ~ ., ScData_NG, method = "forward", nvmax = 20)
+forward.sum = summary(regfit.forward)
+
+# Plot RSS, Cp, BIC & Adjusted R^2
+par(mfrow = c(2,2))
+plot(forward.sum$rss,   xlab = "Numbers of Variables", ylab = "RSS",          type = "l")
+plot(forward.sum$adjr2, xlab = "Numbers of Variables", ylab = "Adjusted Rsq", type = "l")
+abline(v = which.max(forward.sum$adjr2), col = 'red')
+plot(forward.sum$cp,    xlab = "Numbers of Variables", ylab = "Cp",           type = "l")
+abline(v = which.min(forward.sum$cp), col = 'orange')
+plot(forward.sum$bic,   xlab = "Numbers of Variables", ylab = "BIC",          type = "l")
+abline(v = which.min(forward.sum$bic), col = 'blue')
+# ********************************************************************************************
+
+# Backward Subset Selection
+regfit.backward = regsubsets(G3 ~ ., ScData_NG, method = "backward", nvmax = 20)
+backward.sum = summary(regfit.backward)
+
+# Plot RSS, Cp, BIC & Adjusted R^2
+par(mfrow = c(2,2))
+plot(backward.sum$rss,   xlab = "Numbers of Variables", ylab = "RSS",          type = "l")
+plot(backward.sum$adjr2, xlab = "Numbers of Variables", ylab = "Adjusted Rsq", type = "l")
+abline(v = which.max(backward.sum$adjr2), col = 'red')
+plot(backward.sum$cp,    xlab = "Numbers of Variables", ylab = "Cp",           type = "l")
+abline(v = which.min(backward.sum$cp), col = 'orange')
+plot(backward.sum$bic,   xlab = "Numbers of Variables", ylab = "BIC",          type = "l")
+abline(v = which.min(backward.sum$bic), col = 'blue')
+# ********************************************************************************************
+
+# Hybrid Subset Selection
+regfit.seq = regsubsets(G3 ~ ., ScData_NG, method = "seqrep", nvmax = 20)
+seq.sum = summary(regfit.seq)
+
+# Plot RSS, Cp, BIC & Adjusted R^2
+par(mfrow = c(2,2))
+plot(seq.sum$rss,   xlab = "Numbers of Variables", ylab = "RSS",          type = "l")
+plot(seq.sum$adjr2, xlab = "Numbers of Variables", ylab = "Adjusted Rsq", type = "l")
+abline(v = which.max(backward.sum$adjr2), col = 'red')
+plot(seq.sum$cp,    xlab = "Numbers of Variables", ylab = "Cp",           type = "l")
+abline(v = which.min(backward.sum$cp), col = 'orange')
+plot(seq.sum$bic,   xlab = "Numbers of Variables", ylab = "BIC",          type = "l")
+abline(v = which.min(backward.sum$bic), col = 'blue')
+```
+
+-   Issue The Cp and BIC's scales look weird
+
+-   Result (All Predictors):
+Best Subset Selection:     4 predictors -> Sex(M), Mjob(Health), Mjob(Services), failures 
+Foward Subset Selection:   2 predictors -> Medu,   failures 
+Backward Subset Selection: 4 predictors -> Sex(M), Mjob(Health), Mjob(Services), failures 
+Hybrid Subset Selection:   4 predictors -> Sex(M), Mjob(Health), Mjob(Services), failures
+
+-   Result (Socio-economic Predictors): 
+Best Subset Selection:     5 predictors -> Medu, Mjob(Health), Mjob(Services), famsup(yes), paid(yes) 
+Forward Subset Selection:  5 predictors -> Medu, Mjob(Health), Mjob(Services), famsup(yes), paid(yes) 
+Backward Subset Selection: 5 predictors -> Medu, Mjob(Health), Mjob(Services), famsup(yes), paid(yes) 
+Hybrid Subset Selection:   5 predictors -> Medu, Mjob(Health), Mjob(Services), famsup(yes), paid(yes)
+
+This code will be used to explain why first approach does not work (Leaps Library does not support qualitative data)
+
+## 2.2 Self-Defined Forward Subset Selection
+```{r}
+library(dplyr)
+
+# Self-Defined Forward Stepwise Selection Model (Function)
+forward.subset = function(formula, trdata, col.name){
+  # Initialize Formula List
+  model.list = c(formula)
+  for(i in 1:(length(col.name)-1)){
+    # Initialize RSS List For Each i-th Predictor Model
+    RSS = rep(0,length(col.name)-1)
+    for(j in 1:(length(col.name)-1)){
+      # Calculate RSS For Each Possible i-th Predictor Model
+      form = paste(formula, col.name[j], sep = '+')
+      lm.fit = lm(formula=form, data=trdata)
+      RSS[j] = sum(resid(lm.fit)^2)
+    }
+    #plot(1:(length(col.name)-1), RSS, type='l', main=paste('RSS Predictor',i), xlab='Predictor Index', ylab='RSS')
+    # Modify Formula and Predictor List
+    re.index = which(RSS == min(RSS))[1]
+    formula = paste(formula, col.name[re.index], sep = "+")
+    #print(formula)
+    model.list = c(model.list, formula)
+    col.name = col.name[-re.index]
+  }
+  # First Element of Formula List is Useless
+  model.list[-1]
+}
+# ------------------------------------------------------------------------------
+
+# Self-Defined K-Fold Cross Validation (Function)
+Cross.Validation = function(dataset, k, title){
+  #Set Up Input Dataset, Predictor/Formula List & Seed#
+  col.name = colnames(dataset)
+  formula = 'G3 ~'
+  set.seed(1)
+  
+  # Set up folds data & cv-error matrix
+  folds = sample(rep(1:k, length=nrow(dataset)))
+  cv.errors = matrix(NA, k, length(dataset)-1, dimnames=list(1:10, 1:(length(dataset)-1)))
+  # Start performing CV 
+  for(j in 1:k){
+      # For each fold, use "Forward Subset Selection" function
+      trdata = dataset[folds != j, ]
+      formula.list = forward.subset(formula, trdata, col.name)
+      for(i in 1:(length(col.name)-1)){
+        # For each i-th predictors model, use it to predict and compare MSE
+        best.fit = lm(formula.list[i], data=dataset)
+        pred = predict(best.fit, dataset[folds == j,] %>% select(-c("G3")), id = i)
+        cv.errors[j,i] = mean((dataset$G3[folds == j] - pred)^2)
+    }
+  }
+  
+  # Analyze Results
+  # Average out each i-th predictors model in k folds
+  mean.cv.errors = apply(cv.errors, 2, mean)
+  # Plot i-predictor models vs. averaged cv.error
+  par(mfrow = c(1,1))
+  plot(1:(length(dataset)-1), mean.cv.errors, type = "l", main = title, xlab = "Models with # Predictor", ylab = "Mean CV Errors")
+}
+```
+
+```{r}
+# Run K-Fold Cross.Validation Function
+# Socio-Economic Factors Only, Excluding G1, G2
+Cross.Validation(ScData_Socio_NG, 10, "Socio-Econ Factors No G1/G2")
+
+# Socio-Economic Factors Only, Excluding G1, G2
+Cross.Validation(ScData_NG, 10, "All Factors NO G1/G2")
+```
+
+1. According to all graphs, it seems like more socio-economic/all predictors are included in the linear model, the worse it performs.
+2. The more predictors are included, the larger CV errors shown at the scale of y-axis.
+
+```{r}
+# Visualize the Result Using Manual Subset Selection
+col.name = colnames(ScData_Socio_NG)
+sample <- sample(c(TRUE, FALSE), nrow(ScData_Socio_NG), replace=TRUE, prob=c(0.7,0.3))
+train  <- ScData_Socio_NG[sample, ]
+test   <- ScData_Socio_NG[!sample, ]
+formula = 'G3 ~'
+set.seed(1)
+forward.subset(formula, train, col.name)
+```
+
+# 3 Modeling
+```{r}
+# Collect Test_Error From All the Models
+test_error_model = rep(0,6)
+```
+
+## 3.1 Linear Regression
+```{r}
+# Train/Test Data Split
+set.seed(30)
+sample <- sample(c(TRUE, FALSE), nrow(ScData_NG), replace=TRUE, prob=c(0.7,0.3))
+train  <- ScData_NG[sample, ]
+test   <- ScData_NG[!sample, ]
+
+# Model Considering Socio-Econ Factors
+lm.fit1 = lm(G3 ~ Pstatus:Mjob + Medu:Fedu + Medu:Mjob + famsup  , data = train)
+test_pred_1 = predict(lm.fit1, newdata = test %>% select(-G3))
+train_pred_1 = predict(lm.fit1, newdata=train %>% select(-G3))
+LR_Test_MSE_1 = mean((test$G3 - test_pred_1)^2)
+LR_Train_MSE_1 = mean((train$G3 - train_pred_1)^2)
+
+# Model Considering all Factors
+lm.fit2 = lm(G3 ~ age + health + failures + absences:romantic + sex + studytime  + Medu:Mjob, data = train) 
+test_pred_2 = predict(lm.fit2, newdata = test %>% select(-G3))
+train_pred_2 = predict(lm.fit2, newdata = train %>% select(-G3))
+LR_Test_MSE_2 = mean((test$G3 - test_pred_2)^2)
+LR_Train_MSE_2 = mean((train$G3 - train_pred_2)^2)
+test_error_model[1] = LR_Test_MSE_2
+
+# Model that has lowest RSE but highest Test MSE
+lm.overfit = lm(G3 ~ age + health + failures + schoolsup + romantic + school + higher +
+                  sex:health + health:failures + studytime:failures + Dalc:failures +
+                  romantic:absences + higher:absences + address:school+ higher:studytime + higher:age
+                  , data = train)
+test_pred_overfit = predict(lm.overfit, newdata = test %>% select(-G3))
+train_pred_overfit = predict(lm.overfit, newdata = train %>% select(-G3))
+LR_Test_MSE_Overfit = mean((test$G3 - test_pred_overfit)^2)
+LR_Train_MSE_Overfit = mean((train$G3 - train_pred_overfit)^2)
+
+# Visualize the Train/Test Error From Different Models
+plot(c(0,1,2), c(LR_Test_MSE_1, LR_Test_MSE_2, LR_Test_MSE_Overfit),
+     main="Testing Error vs. Training Error",
+     xlab = "Train MSE", ylab = "MSE", type ="p",
+     col = "red", pch=16,
+     ylim=c(10,35))
+lines(c(0,1,2), c(LR_Train_MSE_1, LR_Train_MSE_2, LR_Train_MSE_Overfit),
+      type="p", pch=16)
+text(c(0,1,1.99), c(10,10,10), labels=c("Only Socio-Econ", "General", "Overfit"))
+legend("topleft", legend=c("Train MSE", "Test MSE"), col=c("black","red"), title="Types of Error", lty=1:1, bg="lightblue")
+```
+
+## 3.2 Regression Spline
+```{r}
+library(splines)
+
+# Find Optimal Degree of Freedom (df) Through Cross-Validation
+# Define Folds and CV Array
+set.seed(30)
+max_df = 12
+k = 10
+folds = sample(rep(1:k, length=nrow(ScData_NG)))
+cv.errors = matrix(NA, k, max_df, dimnames=list(1:10, 1:max_df))
+# j represents folds
+for(j in 1:k){
+    # Fetch Train Data Based on Folds
+    trdata = ScData_NG[folds != j, ]
+    # i represents dfs
+    for(i in 1:max_df){
+      # For Each Folds, Try Out Different DF to Fit Models 
+      spline.fit = lm(G3 ~ bs(absences, df = i), data = trdata)
+      # Model Prediction
+      ypred = predict(spline.fit, ScData_NG[folds == j,], id = i)
+      # Calculate MSE
+      cv.errors[j,i] = mean((ScData_NG$G3[folds == j] - ypred)^2)
+  }
+}
+# Average out each i-th predictors model in k folds
+mean.cv.errors = apply(cv.errors, 2, mean)
+# Plot CV Error Plot For Different Dfs
+par(mfrow = c(1,1))
+plot(1:max_df, mean.cv.errors, type = "l", main = "Cross-Validation On Degree of Freedom", xlab = "Degrees of Freedom", ylab = "Mean CV Errors")
+#-------------------------------------------------------------------------------
+
+# Train/Test Split
+set.seed(30)
+sample <- sample(c(TRUE, FALSE), nrow(ScData_NG), replace=TRUE, prob=c(0.7,0.3))
+train  <- ScData_NG[sample, ]
+test   <- ScData_NG[!sample, ]
+
+# Train Model Based on Cross-validation Results
+spline.fit = lm(G3 ~ bs(absences, df = 5), data = train)
+summary(spline.fit)
+
+# Model Prediction
+pred = predict(spline.fit, newdata = test)
+test_MSE = mean((pred - test$G3)^2)
+test_error_model[2] = test_MSE
+test_MSE
+
+# NOTE: We only use "Absence" as predictor in the spline because the "spline" library only support multivariate continous predictors while "absences" & "age" are the only continuous predictors,  
+```
+
+## 3.3 Tree & Forest
+### 3.3.1 Set Up
+```{r}
+# Import Tree library
+library(tree)
+# Splitting into training and testing sets
+set.seed(30)
+treetrain = sample(nrow(ScData_NG), 0.8*nrow(ScData_NG)) #80% randomly split into train data 
+treetest = ScData_NG[-treetrain,]
+```
+
+### 3.3.2 Decision Tree
+```{r}
+# Train the Model using 30 predictors
+tree = tree(G3 ~ ., data = ScData_NG, subset = treetrain)
+# View the summary on tree
+summary(tree)
+# Visualize the Tree
+plot(tree)
+text(tree, pretty = 0)
+
+# Model Prediction
+yhat = predict(tree, newdata = treetest)
+
+# Calculate MSE
+test_MSE = mean((yhat - treetest$G3)^2)
+test_MSE
+```
+The test MSE of the regression tree is r test_MSE.
+
+### 3.3.3 Cross-Validation on Tree Complexity
+```{r}
+# Using cross-validation to determine the optimal level of tree complexity
+cv.ScData_NG = cv.tree(tree)
+plot(cv.ScData_NG)
+
+# Pruning and visualize the tree
+prune.ScData_NG = prune.tree(tree, best = 3)
+plot(prune.ScData_NG)
+text(prune.ScData_NG, pretty = 0)
+
+# Make prediction
+pred = predict(prune.ScData_NG, newdata = treetest)
+
+# Calculate MSE
+pr_test_MSE = mean((pred - treetest$G3)^2)
+test_error_model[3] = pr_test_MSE
+pr_test_MSE
+
+# Compare the MSE difference between Tree model before and after prune
+pr_diff = abs(pr_test_MSE - test_MSE)
+```
+The test MSE of the regression tree after prunning is r pr_test_MSE.
+According to the cross validation, we observed that size = 3 yields the least deviance.
+
+### 3.3.4 Bagging Forests
+```{r}
+# Import Bagging/Random Forest Library
+library(randomForest)
+set.seed(30)
+
+# Train Bagging Model using 30 predictors
+bag.ScData_NG = randomForest(G3 ~., data = ScData_NG, subset = treetrain, mtry = 30, importance = TRUE)
+# Model Prediction
+pred.bag = predict(bag.ScData_NG, newdata = treetest)
+
+# Show how much prediction explains the outcome
+plot(pred.bag, treetest$G3)
+abline(0,1)
+
+# Calculate MSE
+bag_MSE = mean((pred.bag - treetest$G3)^2)
+test_error_model[4] = bag_MSE
+bag_MSE
+```
+The test MSE of the bagging forest is: `r bag_MSE`
+
+### 3.3.5 Random Forests
+```{r}
+set.seed(30)
+# Train Random Forests Model using 30 predictors
+rf.ScData_NG = randomForest(G3 ~., data = ScData_NG, subset = treetrain, mtry = 10, importance = TRUE)
+# Model Prediction
+pred.rf = predict(rf.ScData_NG, newdata = treetest)
+
+# Show how much prediction explains the outcome
+plot(pred.rf, treetest$G3)
+abline(0,1)
+
+# Calculate MSE
+rf_MSE = mean((pred.rf - treetest$G3)^2)
+test_error_model[5] = rf_MSE
+rf_MSE
+```
+The test MSE of the random forest is: `r bag_MSE`
+
+### 3.3.6 Variable Importance Analysis
+```{r}
+# Visualize Which Variables are Important
+im = importance(rf.ScData_NG)
+varImpPlot(rf.ScData_NG)
+```
+"Failure" and "Absences" is the two most important variable based on the graph
+
+
+## 3.4 Neural Network
+### 3.4.1 Data Preparation
+```{r}
+library(keras)
+library(dplyr)
+
+# Separate X and Y
+train = sample(nrow(ScData_NG), nrow(ScData_NG)/2)
+x = ScData_NG %>% select(-c("G3"))
+y = ScData_NG %>% select(c("G3"))
+
+# Standardization
+x[,3] = scale(x[,3])
+x[,30] = scale(x[,30])
+
+# Train/Test Split
+x_train_df = x[train,] 
+x_test_df = x[-train,]
+y_train_df = y[train,]
+y_test_df = y[-train,]
+
+# Convert to Array Class
+x_train = array(data=c(unlist(x_train_df)),
+                dim=c(nrow(x_train_df),ncol(x_train_df)),
+                dimnames = list(1:nrow(x_train_df), colnames(x_train_df)))
+x_test = array(data=c(unlist(x_test_df)),
+               dim=c(nrow(x_test_df),ncol(x_test_df)),
+               dimnames = list(1:nrow(x_test_df), colnames(x_test_df)))
+y_train = array(data=c(unlist(y_train_df)),
+                dim=c(length(y_train_df),1))
+y_test = array(data=c(unlist(y_test_df)),
+                dim=c(length(y_test_df),1))
+```
+
+### 3.4.2 Deep Learning
+```{r}
+# Original Version From Textbook
+# Set Up Model
+modelnn = keras_model_sequential()
+modelnn %>% 
+  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 1)
+  
+# Compile Model
+modelnn %>% compile(loss = "mse", 
+                    optimizer = optimizer_rmsprop(),
+                    metrics = list("mean_squared_error"))
+
+# Fit Model
+history = modelnn %>% fit(x_train, y_train, epochs = 50, batch_size = 32, verbose = 0)
+train_error = history$metrics$mean_squared_error
+
+# Plot Train Error in epochs
+plot(1:length(train_error), train_error,
+    type="l", main="Train MSE Throughout Epoches",
+    xlab="Epoches", ylab="Train MSE", col="red")
+
+# Model Prediction
+ypred = predict(modelnn, x_test)
+test_error_origin = mean((y_test - ypred)^2)
+# ------------------------------------------------------------------------------
+
+# Tuned Version
+modelnn1 = keras_model_sequential()
+modelnn1 %>% 
+  layer_dense(units = 150, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 1)
+
+# Compile Model
+modelnn1 %>% compile(loss = "mse", 
+                    optimizer = optimizer_rmsprop(),
+                    metrics = list("mean_squared_error"))
+
+# Fit Model
+history = modelnn1 %>% fit(x_train, y_train, epochs = 100, batch_size = 64, verbose = 0)
+train_error = history$metrics$mean_squared_error
+lines(1:length(train_error), train_error, type="l", col = "black")
+legend("topright", legend=c("original", "tuned"), col=c("red","black"), title="Original & Tuned", bg="lightblue", lty=1:1)
+
+# Model Prediction
+ypred = predict(modelnn1, x_test)
+test_error_tune = mean((y_test - ypred)^2)
+test_error_model[6] = min(test_error_tune, test_error_origin)
+
+# Plot the Bar Plot
+barplot(c(test_error_origin, test_error_tune), names.arg=c("Original", "Tuned"), main="Test Error Before and After Tuning", ylab="Test MSE", xlab="Version(Original/Tuned")
+```
+
+### 3.4.3 Hyper-parameter Tuning for "Layer Dropout Rate"
+```{r}
+# Create List for possible dropout rates
+rate = c(0.2, 0.4, 0.6, 0.8)
+color = c("black", "red", "blue", "green")
+legend = c("Line with 0.2", "Line with 0.4", "Line with 0.6", "Line with 0.8")
+# Create list of test_error
+test_error = rep(0, 4)
+
+# Start Tuning
+for(i in 1:length(rate)){
+  # Set Up Model
+  modelnn = keras_model_sequential()
+  modelnn %>% layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+    layer_dropout(rate = rate[i]) %>%
+    layer_dense(units = 1) 
+    
+  # Compile Model
+  modelnn %>% compile(loss = "mse", 
+                      optimizer = optimizer_rmsprop(),
+                      metrics = list("mean_squared_error"))
+  
+  # Fit Model
+  history = modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  train_error = history$metrics$mean_squared_error
+  
+  # Plot train error vs. dropout rate
+  if(i == 1){
+    plot(1:length(train_error), train_error,
+         type="l", main="Train MSE Throughout Epoches",
+         xlab="Epoches", ylab="Train MSE", col=color[i])
+  }
+  lines(1:length(train_error), train_error, type ="l", col=color[i])
+  
+  # Model Prediction
+  ypred = predict(modelnn, x_test)
+  test_error[i] = mean((y_test - ypred)^2)
+}
+# Plot Legend
+legend("topright", legend=legend, col=color, title="Different Dropout Rate", bg="lightblue", lty=1:1:1:1)
+
+# plot test error vs. dropout rate
+plot(rate, test_error,
+     type="b", main="Test MSE with Different Dropout Rate",
+     xlab="Dropout Rate", ylab="Test MSE",
+     pch = 16)
+```
+
+### 3.4.4 Hyper-parameter Tuning for "Batch Size"
+```{r}
+# Create List for possible batch size
+batch = c(8, 16, 32, 64, 128, nrow(x_train))
+color = c("black", "red", "blue", "green", "purple", "yellow")
+legend = c("Line with 8", "Line with 16", "Line with 32", "Line with 64", "Line with 128", paste("Line with ",nrow(x_train)))
+# Create list of test_error
+test_error = rep(0, 6)
+
+# Start Tuning
+for(i in 1:length(batch)){
+  # Set Up Model
+  modelnn = keras_model_sequential()
+  modelnn %>% layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+    layer_dropout(rate = 0.4) %>%
+    layer_dense(units = 1) 
+    
+  # Compile Model
+  modelnn %>% compile(loss = "mse", 
+                      optimizer = optimizer_rmsprop(),
+                      metrics = list("mean_squared_error"))
+  
+  # Fit Model
+  history = modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = batch[i], verbose = 0)
+  train_error = history$metrics$mean_squared_error
+  
+  # Plot train error vs. batch sizes
+  if(i == 1){
+    plot(1:length(train_error), train_error,
+         type="l", main="Train MSE Throughout Epoches",
+         xlab="Epoches", ylab="Train MSE", col=color[i])
+  }
+  lines(1:length(train_error), train_error, type ="l", col=color[i])
+  
+  # Model Prediction
+  ypred = predict(modelnn, x_test)
+  test_error[i] = mean((y_test - ypred)^2)
+}
+# Plot Legend
+legend("topright", legend=legend, col=color, title="Different Batch Size", bg="lightblue", lty=1:1:1:1:1:1)
+
+# plot test error vs. batch sizes
+plot(batch, test_error,
+     type="b", main="Test MSE with Different Batch Size",
+     xlab="Batch Size", ylab="Test MSE",
+     pch = 16)
+text(batch, test_error, label=batch, adj=0.5, pos=2)
+```
+
+### 3.4.5 Hyper-parameter Tuning for "Epoches"
+```{r}
+# Create List for possible epochs
+epochs = c(10, 50, 100, 150, 200)
+# Create list of test_error
+test_error = rep(0, 5)
+
+for(i in 1:length(epochs)){
+  # Set Up Model
+  modelnn = keras_model_sequential()
+  modelnn %>% layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+    layer_dropout(rate = 0.4) %>%
+    layer_dense(units = 1) 
+  
+  # Compile Model
+  modelnn %>% compile(loss = "mse", 
+                      optimizer = optimizer_rmsprop(),
+                      metrics = list("mean_squared_error"))
+  
+  # Fit Model
+  modelnn %>% fit(x_train, y_train, epochs = epochs[i], batch_size = 32, verbose = 0)
+  
+  # Model Prediction
+  ypred = predict(modelnn, x_test)
+  test_error[i] = mean((y_test - ypred)^2)
+}
+
+# plot test error vs. epochs
+plot(epochs, test_error,
+     type="b", main="Test MSE with Different Epochs",
+     xlab="Epochs", ylab="Test MSE",
+     pch = 16, ylim= c(15, 24.5))
+text(epochs, test_error, label=epochs, adj=0.5, pos=3)
+```
+
+### 3.4.6 Hyper-parameter Tuning for "Neuron Units"
+```{r}
+# Create List for possible neuron units
+units = c(25, 50, 100, 150, 200)
+color = c("black", "red", "blue", "green", "yellow")
+legend = c("Line with 25", "Line with 50", "Line with 100", "Line with 150", "Line with 200")
+
+for(i in 1:length(units)){
+  # Set Up Model
+  modelnn = keras_model_sequential()
+  modelnn %>% layer_dense(units = units[i], activation = "relu", input_shape = ncol(x_train)) %>%
+    layer_dropout(rate = 0.4) %>%
+    layer_dense(units = 1) 
+  
+  # Compile Model
+  modelnn %>% compile(loss = "mse", 
+                      optimizer = optimizer_rmsprop(),
+                      metrics = list("mean_squared_error"))
+  
+  # Fit Model
+  history = modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  train_error = history$metrics$mean_squared_error
+  
+  # Plot train error vs. # neuron units
+  if(i == 1){
+    plot(1:length(train_error), train_error,
+         type="l", main="Train MSE Throughout Epoches",
+         xlab="Epoches", ylab="Train MSE", col=color[i],
+         ylim=c(10,60))
+  }
+  lines(1:length(train_error), train_error, type ="l", col=color[i])
+  
+  # Model Prediction
+  ypred = predict(modelnn, x_test)
+  test_error[i] = mean((y_test - ypred)^2)
+}
+# Plot Legend
+legend("topright", legend=legend, col=color, title="Different Numbers of Neuron Units", bg="lightblue", lty=1:1:1:1:1)
+
+
+# Create list of test_error
+test_error = rep(0, 5)
+# Calculate Average Test Error
+for(i in 1:length(units)){
+  temp_test_error = rep(0,5)
+  for(j in 1:5){
+    # Same Thing As Above
+    modelnn = keras_model_sequential()
+    modelnn %>% layer_dense(units = units[i], activation = "relu", input_shape = ncol(x_train)) %>%
+    layer_dropout(rate = 0.4) %>%
+    layer_dense(units = 1) 
+    modelnn %>% compile(loss = "mse", 
+                        optimizer = optimizer_rmsprop(),
+                        metrics = list("mean_squared_error"))
+    modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+    ypred = predict(modelnn, x_test)
+    temp_test_error[j] = mean((y_test - ypred)^2)
+  }
+  # This calculate the average of test error for each different #unit
+  test_error[i] = mean(temp_test_error)
+}
+
+# plot test error vs. batch sizes
+plot(units, test_error,
+     type="b", main="Test MSE with Different Neuron Units Amount",
+     xlab="# Neuron Units", ylab="Test MSE",
+     pch = 16, xlim=c(20,205))
+text(units, test_error, label=units, adj=0.5, pos=2)
+```
+
+### 3.4.7 Hyper-parameter Tuning for "Hidden Layers"
+```{r}
+# List for Plotting
+color = c("black", "red", "blue", "green", "yellow")
+legend = c("Line with 25", "Line with 50", "Line with 100", "Line with 150", "Line with 200")
+# Create list of test_error
+test_error = rep(0, 4)
+
+# Original Layout
+temp_test_error = rep(0,5)
+for(i in 1:5){
+  modelnn = keras_model_sequential()
+  modelnn %>% 
+    
+  # 2 Dense & 1 Dropout  
+  layer_dense(units = 50, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 1) 
+  
+  modelnn %>% compile(loss = "mse", optimizer = optimizer_rmsprop(), metrics = list("mean_squared_error"))
+  modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  ypred = predict(modelnn, x_test)
+  temp_test_error[i] = mean((y_test - ypred)^2)
+}
+test_error[1] = mean(temp_test_error)
+#-------------------------------------------------------------------------------
+
+# New Layout 1
+temp_test_error = rep(0,5)
+for(i in 1:5){
+  modelnn = keras_model_sequential()
+  modelnn %>% 
+    
+  # 3 Dense & 2 Dropout  
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 1)   
+  
+  modelnn %>% compile(loss = "mse", optimizer = optimizer_rmsprop(), metrics = list("mean_squared_error"))
+  modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  ypred = predict(modelnn, x_test)
+  temp_test_error[i] = mean((y_test - ypred)^2)
+}
+test_error[2] = mean(temp_test_error)
+#-------------------------------------------------------------------------------
+
+# New Layout 2
+temp_test_error = rep(0,5)
+for(i in 1:5){
+  modelnn = keras_model_sequential()
+  modelnn %>% 
+    
+  # 4 Dense & 1 Dropout  
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 1)   
+  
+  modelnn %>% compile(loss = "mse", optimizer = optimizer_rmsprop(), metrics = list("mean_squared_error"))
+  modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  ypred = predict(modelnn, x_test)
+  temp_test_error[i] = mean((y_test - ypred)^2)
+}
+test_error[3] = mean(temp_test_error)
+#-------------------------------------------------------------------------------
+
+# New Layout 3
+temp_test_error = rep(0,5)
+for(i in 1:5){
+  modelnn = keras_model_sequential()
+  modelnn %>% 
+    
+  # Only Dense No Dropout  
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(x_train)) %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 1)   
+  
+  modelnn %>% compile(loss = "mse", optimizer = optimizer_rmsprop(), metrics = list("mean_squared_error"))
+  modelnn %>% fit(x_train, y_train, epochs = 100, batch_size = 32, verbose = 0)
+  ypred = predict(modelnn, x_test)
+  temp_test_error[i] = mean((y_test - ypred)^2)
+}
+test_error[4] = mean(temp_test_error)
+#-------------------------------------------------------------------------------
+
+# plot test error vs. batch sizes
+barplot(test_error, names.arg=c("Original Layout", "New Layeout1", "New Layerout2", "New Layerout3"), main="Test MSE with Different Layers Layouts", xlab="Types of Layouts", ylab="Test MSE")
+```
+
+## 3.5 Comparison of All Models
+```{R}
+barplot(test_error_model, 
+        names.arg=c("LinReg", "Spline", "DecTre", "Bag", "RandFore", "NeuralNet"), 
+        main="Test Error Comparison of Models",
+        xlab="Types of Model", ylab="Test MSE")
+```
