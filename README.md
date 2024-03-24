@@ -1,5 +1,5 @@
 # CSE-MATH-180-Student-Performance-Prediction
-## Purpose:
+## Description:
 The project aimed to investigate the significant socio-economic factors contributing to affecting student performance in school. We decided to use feature selection to identify important features and predict the students' performance with several machine-learning models.
 
 ## Project Details:
