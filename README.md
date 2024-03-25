@@ -15,5 +15,10 @@ The project aimed to investigate the significant socio-economic factors contribu
 - [MATH 180 Report.pdf](https://github.com/StevenG777/UCM-MATH180-Student-Performance-Prediction/blob/main/MATH%20180%20Report.pdf): Detailed report for the project
 - [MATH.csv](https://github.com/StevenG777/UCM-MATH180-Student-Performance-Prediction/blob/main/Math.csv): Dataset file
 
+## Results:
+- Failures and Absence are the significant factors to enhance the performance of the model. However, none of them were socio-economic factors. We concluded that the socio-economics perspective of students were not significant in predicting the student’s performance
+- Random forests model led in minimizing error differences ranging from 0-36.7%
+- Utilized cross-validation to prune decision trees, select spline’s degrees of freedom, and tune hyperparameters resulting in an 8.5% decrease in test errors
+
 ## Reference
 Kaggle dataset source: [Link](https://www.kaggle.com/datasets/whenamancodes/student-performance)
